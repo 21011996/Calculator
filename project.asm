@@ -21,7 +21,7 @@ section .text
 .current:	resq	1
 .length:	resq	1
 .balance:	resq	1
-	endstrucn
+	endstruc
 ;I'm too lazy to save CSR 
 %macro push_regs 0
 	push rbx
