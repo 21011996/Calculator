@@ -129,11 +129,11 @@ isDigit:
 	
 	jmp .return_0
 	
-	return_1:
+	.return_1:
 		inc rax
 		ret
 	
-	.return_0
+	.return_0:
 		ret
 
 
@@ -238,18 +238,18 @@ parseInt:
 	xor r11, r11	; result is stored there
 	
 	.loop:
-	mov r10, byte[r9]	; r10 = string[r9]
-	cmp r10, 0
+	mov r10b, byte[r9]	; r10 = string[r9]
+	cmp r10b, 0
 	je .cleanup_return	;end of string
 	
 	inc r9
 	sub r10, '0'	; convert to number
-	mul r11, 10	; r11*10 + r10
+	imul r11, 10	; r11*10 + r10
 	add r11, r10
 	
 	jmp .loop
 	
-	.cleanup_return
+	.cleanup_return:
 		mov rax, r11
 		pop r9
 		pop r10
@@ -328,21 +328,21 @@ parseMultiplier:
 	je .return_abs
 	
 	call parseValue
-	jmp cleanup_return
+	jmp .cleanup_return
 	
 	
 	.return_error:
 		inc r9	; basically r9 = 0, if r9>0 then error occured 
 		jmp .cleanup_return
 	
-	.return_minus
+	.return_minus:
 		call parseMultiplier
 		mov r10, rax
 		neg r10
 		mov rax, r10
 		jmp .cleanup_return
 	
-	.return_abs
+	.return_abs:
 		call parseMultiplier
 		mov r10, rax
 		xor r11, r11
