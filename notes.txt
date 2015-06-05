@@ -1,0 +1,3 @@
+RDI = input string in most cases
+RDX = Lexer always after constructor
+R9 = error flag
