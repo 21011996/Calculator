@@ -12,6 +12,8 @@ global parseSum
 global parseMultiplier
 global next
 global isDigit
+global parseValue
+global parseInt
 
 section .text
 
@@ -22,6 +24,7 @@ section .text
 .length:	resq	1
 .balance:	resq	1
 	endstruc
+	
 ;I'm too lazy to save CSR 
 %macro push_regs 0
 	push rbx
@@ -201,9 +204,6 @@ next:
 			
 			ret
 			
-			
-		
-		
 	.return_symbol:
 		push r14
 		
@@ -223,7 +223,83 @@ next:
 		ret
 
 
+; String to int
+;
+;Takes:
+;	RDI - string
+;Returns:
+;	RAX - integer value of string
+parseInt:
+	push r11
+	push r10
+	push r9
 	
+	mov r9, rdi	; r9 = string
+	xor r11, r11	; result is stored there
+	
+	.loop:
+	mov r10, byte[r9]	; r10 = string[r9]
+	cmp r10, 0
+	je .cleanup_return	;end of string
+	
+	inc r9
+	sub r10, '0'	; convert to number
+	mul r11, 10	; r11*10 + r10
+	add r11, r10
+	
+	jmp .loop
+	
+	.cleanup_return
+		mov rax, r11
+		pop r9
+		pop r10
+		pop r11
+		ret
+	
+
+; Parses value of Lexer.current
+;
+;Takes:
+;	RDX + Lexer.current
+;Returns
+;	RAX - value
+parseValue:
+	push rdi
+	push rcx
+	
+	mov rdi, [rdx + Lexer.current]
+	xor rcx, rcx
+	call isDigit
+	cmp rax, rcx
+	
+	jg .return_value
+	
+	cmp byte[rdi], '('
+	je .return_Expression
+	
+	jmp .return_error
+	
+	.return_value:
+		call parseInt
+		jmp .cleanup_return
+		
+	.return_Expression:
+		mov rcx, qword[rdx + Lexer.balance]
+		inc rcx
+		mov qword[rdx + Lexer.balance], rcx
+		call parseExpr
+		jmp .cleanup_return
+		
+	.return_error:
+		inc r9
+		jmp .cleanup_return
+		
+	.cleanup_return:
+		pop rcx
+		pop rdi
+		ret
+		
+
 ; Parses expression in Lexer, return value of expression if it features mul
 ;
 ;Takes:
@@ -231,6 +307,9 @@ next:
 ;Returns:
 ;	RAX - value of Lexer
 parseMultiplier:
+	push r11
+	push r10
+	push r8
 	push rsi
 	
 	call next
@@ -248,24 +327,44 @@ parseMultiplier:
 	cmp byte[r8], '+'
 	je .return_abs
 	
+	call parseValue
+	jmp cleanup_return
+	
 	
 	.return_error:
 		inc r9	; basically r9 = 0, if r9>0 then error occured 
-		ret
+		jmp .cleanup_return
 	
 	.return_minus
 		call parseMultiplier
 		mov r10, rax
 		neg r10
 		mov rax, r10
-		ret
+		jmp .cleanup_return
 	
 	.return_abs
 		call parseMultiplier
+		mov r10, rax
+		xor r11, r11
+		cmp r10, r11
+		jl .neg
+		jmp .normal
 		
+		.neg:
+			neg r10
+			mov rax, r10
+			jmp .cleanup_return
+			
+		.normal:
+			mov rax, r10
+			jmp .cleanup_return
+		
+	.cleanup_return:
+		pop r8
+		pop r10
+		pop r11
+		ret
 	
-	ret
-
 
 ; Parses expression in Lexer, return value of expression if it features sum
 ;
