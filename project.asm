@@ -35,13 +35,13 @@ section .text
 %macro check_error 0
 	xor rax, rax
 	cmp r9, rax
-	jg .return
+	jg .return_1
 	jmp .proceed
 
-	.return
+	.return_1:
 		ret
 	
-	.proceed
+	.proceed:
 %endmacro
 
 ;I'm too lazy to save CSR 
@@ -451,7 +451,7 @@ parseSum:
 		imul r9, rax	; left = left * parseMultiplier()
 		jmp .loop
 		
-	.divide
+	.divide:
 		call parseMultiplier	; "right" = parseMultiplier
 		mov r11, rax	; r11 = "right"
 		
@@ -469,7 +469,7 @@ parseSum:
 		
 		pop rdx
 		
-		jmp. loop
+		jmp .loop
 	
 	.return_error:
 		pop r8
@@ -516,7 +516,7 @@ parseExpr:
 		je .return_minus_balance
 		
 		cmp byte[r8], 0
-		je .return
+		je .just_return
 		
 		cmp byte[r8], '+'
 		je .sum
@@ -534,7 +534,7 @@ parseExpr:
 		mov rax, r9	; return left
 		jmp .cleanup_return
 		
-	.return:
+	.just_return:
 		mov rax, r9	; return left
 		jmp .cleanup_return
 		
