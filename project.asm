@@ -17,6 +17,13 @@ global parseInt
 
 section .text
 
+; Structure Lexer to work with recursive calls from outside
+;
+; .s - address of given string
+; .cur - number, witch reflects where parser is currently working in the .s
+; .current - working string, usually = (Expression)
+; .length - .s.length()
+; .balance - counter for brackets balance, helps to check validity of .s  
 	struc Lexer
 .s:	resq	1
 .cur:	resq	1
@@ -24,7 +31,19 @@ section .text
 .length:	resq	1
 .balance:	resq	1
 	endstruc
+
+%macro check_error 0
+	xor rax, rax
+	cmp r9, rax
+	jg .return
+	jmp .proceed
+
+	.return
+		ret
 	
+	.proceed
+%endmacro
+
 ;I'm too lazy to save CSR 
 %macro push_regs 0
 	push rbx
@@ -56,16 +75,26 @@ section .text
 ;Returns:
 ;	RAX - length(string)
 strlength:
-	xor rcx, rcx ; make 0
-	xor al, al	; make 0
-	not rcx	; make highest value 
+	push r9	; because of working with recursive methods it's safer to save all used registers
+	push r8 ; the only register, witch I don't need to save is RAX, 
+			; because in recursion ones it contains answer, we got answer for everything.
 	
-	cld
-	repne scasb	; finding NULL in string
+	xor r9,r9	; r9 = length
+	mov r8, rdi	; r8 = address of string
 	
-	not rcx
-	dec rcx	; converting RCX to the answer value
-	mov rax, rcx
+	.loop:
+		cmp byte[r8], 0 ; if (end of string)
+		je .return	; then
+		inc r9	; else
+		inc r8
+		jmp .loop
+		
+	.return:
+		mov rax, r9	; return answer
+		
+		pop r8
+		pop r9
+		ret
 	
 	ret
 
@@ -77,6 +106,7 @@ strlength:
 ;Returns:
 ;	RAX - pointer at structure Lexer
 constructor:
+	push rdx
 	push rdi
 	push rsi
 	
@@ -99,6 +129,8 @@ constructor:
 	mov qword[rdx + Lexer.length], rax
 	
 	mov rax, rdx
+	
+	pop rdx
 	
 	ret
 
@@ -138,19 +170,25 @@ isDigit:
 
 
 ; Returns sub string - next token to parse
+;
 ;Takes:
 ;	RDI - string
 ;	RDX - Lexer
 ;Returns:
-;	RSI - sub string
+;	RCX - sub string
 next:
+	push r11
+	push r10
+	push r15
+	push rax
+	
 	mov r10, qword[rdx + Lexer.cur]
 	mov r11, qword[rdx + Lexer.length]
 	cmp r10, r11	;if (end of string)
 	
 	je .return_empty
 	
-	mov rcx, qword[rdx + Lexer.cur]	; if (charAtcur is digit)
+	mov r15, qword[rdx + Lexer.cur]	; if (charAtcur is digit)
 	call isDigit
 
 	cmp rax, 1
@@ -158,14 +196,15 @@ next:
 	jmp .return_symbol	; else
 	
 	.return_next_token:
+		push r14
+		push r13
+		push r12
+		push r8
+		
 		mov r8, qword[rdx + Lexer.cur]	; create variable j = cur
 		
-		push r12
-		push r13
-		push r14
-		
 		.loop1:
-			mov r14, qword[r8]
+			mov r14, r8
 			inc r14	; create j+1
 			
 			mov r13, qword[rdx + Lexer.length] ; r13 = s.length()
@@ -173,7 +212,7 @@ next:
 			cmp r14, r13	; !if (j+1<s.length)
 			jge .return_substring	; then
 			
-			mov rcx, r14	; if !(char at j + 1 is digit)
+			mov r15, r14	; if !(char at j + 1 is digit)
 			call isDigit
 			cmp rax, 0
 			je .return_substring	; then
@@ -186,23 +225,24 @@ next:
 			inc r8
 			mov qword[rdx + Lexer.cur], r8	; set Lexer.cur = j + 1
 			dec r8
-			;copy sub string (r12, j) from rdi to rsi
+			;copy sub string (r12, j) from rdi to rcx
 			xor r11, r11
 			.loop2:
 				mov al, byte[rdi + r12]
 				inc r12
-				mov byte[rsi + r11], al
+				mov byte[rcx + r11], al
 				inc r11
 				cmp r12, r8
 				jle .loop2
 			
-			mov byte [rsi+r11], 0
+			mov byte [rcx+r11], 0
 			
-			pop r14
-			pop r13
+			pop r8
 			pop r12
+			pop r13
+			pop r14
 			
-			ret
+			jmp .cleanup_return
 			
 	.return_symbol:
 		push r14
@@ -210,16 +250,24 @@ next:
 		mov r14, qword [rdx + Lexer.cur]	; move cur to r14
 		add r14, rdi	; r14 = position in s of cur-th char
 		mov al, byte [r14]	; al = s(cur)
-		mov byte [rsi], al	; put answer
-		mov byte [rsi + 1], 0
+		mov byte [rcx], al	; put answer
+		mov byte [rcx + 1], 0
 		
 		add qword [rdx + Lexer.cur], 1
 		
 		pop r14
-		ret
+		jmp .cleanup_return
 	
 	.return_empty:
-		mov byte [rsi], 0
+		mov byte [rcx], 0
+		jmp .cleanup_return
+		
+	.cleanup_return:
+		pop rax
+		pop r15
+		pop r10
+		pop r11
+		
 		ret
 
 
@@ -264,6 +312,8 @@ parseInt:
 ;Returns
 ;	RAX - value
 parseValue:
+	check_error
+	
 	push rdi
 	push rcx
 	
@@ -307,16 +357,15 @@ parseValue:
 ;Returns:
 ;	RAX - value of Lexer
 parseMultiplier:
+	check_error
+	
 	push r11
 	push r10
 	push r8
-	push rsi
 	
 	call next
-	mov [rdx + Lexer.current], rsi	; current = next()
-	mov r8, [rsi]	; r8 = next, to work with
-	
-	pop rsi
+	mov [rdx + Lexer.current], rcx	; current = next()
+	mov r8, rcx	; r8 = next, to work with
 	
 	cmp byte[r8], 0
 	je .return_error
@@ -373,9 +422,75 @@ parseMultiplier:
 ;Returns:
 ;	RAX - value of Lexer
 parseSum:
-	call parseMultiplier
+	check_error
 	
-	ret
+	push r11
+	push r10
+	push r9
+	push r8
+	
+	call parseMultiplier
+	mov r9, rax	; lets call r9 "left"
+	
+	.loop:
+		call next
+		mov [rdx + Lexer.current], rcx	; current = next()
+		mov r8, rcx	; r8 = next, to work with
+		
+		cmp byte[r8], '*'
+		je .multiply
+		
+		cmp byte[r8], '/'
+		je .divide
+		
+		jmp .return_left
+		
+		
+	.multiply:
+		call parseMultiplier
+		imul r9, rax	; left = left * parseMultiplier()
+		jmp .loop
+		
+	.divide
+		call parseMultiplier	; "right" = parseMultiplier
+		mov r11, rax	; r11 = "right"
+		
+		xor r10, r10
+		
+		cmp r11, r10	; if (right = 0)
+		je .return_error	; then
+		; else
+		push rdx	; preparations for IDIV
+		xor rdx, rdx
+		mov rax, r9
+		
+		idiv r11	; r9/r11
+		mov r9, rax ; left = left / right
+		
+		pop rdx
+		
+		jmp. loop
+	
+	.return_error:
+		pop r8
+		pop r9
+		pop r10
+		pop r11
+		
+		inc r9	; set error flag
+		ret
+		
+	.return_left:
+		mov rax, r9
+		jmp .cleanup_return
+		
+	.cleanup_return:
+		pop r8
+		pop r9
+		pop r10
+		pop r11
+		
+		ret
 
 
 ; Parses expression in Lexer, return value of expression
@@ -385,22 +500,81 @@ parseSum:
 ;Returns:
 ;	RAX - value of 
 parseExpr:
+	check_error
+	
+	push r10
+	push r9
+	push r8
+
 	call parseSum
+	mov r9, rax	; "left" = parseSum()
 	
-	ret
+	.loop:
+		mov r8, [rdx + Lexer.current]
+		
+		cmp byte[r8], ')'
+		je .return_minus_balance
+		
+		cmp byte[r8], 0
+		je .return
+		
+		cmp byte[r8], '+'
+		je .sum
+		
+		cmp byte[r8], '-'
+		je .diff
+		
+		jmp .loop
+		
+	.return_minus_balance:
+		mov r10, qword[rdx + Lexer.balance]	; balance--
+		dec r10
+		mov qword[rdx + Lexer.balance], r10
+		
+		mov rax, r9	; return left
+		jmp .cleanup_return
+		
+	.return:
+		mov rax, r9	; return left
+		jmp .cleanup_return
+		
+	.sum:
+		call parseSum
+		add r9, rax	; left = left + parseSum()
+		jmp .loop
+		
+	.diff:
+		call parseSum
+		sub r9, rax	; left = left - parseSum()
+		jmp .loop
+		
+	.cleanup_return:
+		pop r8
+		pop r9
+		pop r10
+		
+		ret
+		
 	
-; "main" of program
+; int calculate(char const *s, int error_code);
 ; Takes String, returns parsed value.
 ;
 ;Takes:
 ;	RDI - string
+;	RSI - error_code ( after executing calculate user can check int error_code)
 ;Returns:
 ;	RAX - calculated value of given string
 calculate:
+	push rsi	; just in case
+	
 	xor r9, r9	; r9 = 1 if an error occurred
 	call constructor	; create Lexer from string
-	mov rdx, rax	 ; move Lexer to safe register, from now, Lexer is always in RDX
-	call parseExpr
+	mov rdx, rax	; move Lexer to safe register, from now, Lexer is always in RDX
+	call parseExpr	; rax = parseExpr
+	
+	pop rsi
+	
+	mov rsi, r9	; int error_code > 0, if there were errors
 	
 	ret
 
