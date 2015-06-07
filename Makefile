@@ -2,11 +2,11 @@ CXXFLAGS=-g -O0
 
 YASM_FLAGS=-f elf64 -g dwarf2
 
-all: tester.o
+all: project.o
 
 test: test.o all
-	g++ $(CXXFLAGS) -o test test.o tester.o -lgmp
+	g++ $(CXXFLAGS) -o test test.o project.o
 
 
-tester.o: tester.asm
-	yasm tester.asm $(YASM_FLAGS) -o tester.o
+project.o: project.asm
+	yasm project.asm $(YASM_FLAGS) -o project.o

@@ -20,17 +20,7 @@ extern "C" {
 Extracts value from string
 */
 
-void calculate(char const *s, int64_t code);
-
-Lexer constructor(char const *s, char *a);
-int strlength(char const *s);
-int parseExpr(Lexer lex);
-int parseSum(Lexer lex);
-int parseMultiplier(Lexer lex);
-void next(Lexer lex,char *s);
-int isDigit(char const *s, int number);
-int parseValue(Lexer lex);
-int parseInt(char const *s);
+int calculate(char const *s, int code);
 
 #ifdef __cplusplus
 }

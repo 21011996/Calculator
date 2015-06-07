@@ -35,10 +35,10 @@ section .text
 %macro check_error 0
 	xor rax, rax
 	cmp r9, rax
-	jg .return_1
+	jg .return_e
 	jmp .proceed
 
-	.return_1:
+	.return_e:
 		ret
 	
 	.proceed:
@@ -109,12 +109,14 @@ constructor:
 	push rdx
 	push rdi
 	push rsi
+	push r9	; i wonder why calloc spoils r9?
 	
 	mov rdi, 1	;allocate 1 Lexer
 	mov rsi, Lexer_size	;Lexer size
 	call calloc
 	mov rdx, rax	;address of Lexer
 	
+	pop r9
 	pop rsi
 	pop rdi
 	
@@ -137,6 +139,7 @@ constructor:
 
 ; Returns 1 if char at RCX in RDI is digit, zero otherwise
 ;
+
 ;Takes:
 ;	RCX - number
 ;	RDI - string
@@ -151,21 +154,21 @@ isDigit:
 	add r15, rcx
 	
 	cmp byte[r15], '0'
-	jge .return_1
+	jl .return_0
 	
 	cmp byte[r15], '9'
 	
-	pop r15
+	jg .return_0
 	
-	jle .return_1
-	
-	jmp .return_0
+	jmp .return_1
 	
 	.return_1:
 		inc rax
+		pop r15
 		ret
 	
 	.return_0:
+		pop r15
 		ret
 
 
@@ -188,8 +191,12 @@ next:
 	
 	je .return_empty
 	
-	mov r15, qword[rdx + Lexer.cur]	; if (charAtcur is digit)
+	push rcx
+
+	mov rcx, qword[rdx + Lexer.cur]	; if (charAtcur is digit)
 	call isDigit
+
+	pop rcx
 
 	cmp rax, 1
 	je .return_next_token	; then
@@ -212,8 +219,13 @@ next:
 			cmp r14, r13	; !if (j+1<s.length)
 			jge .return_substring	; then
 			
-			mov r15, r14	; if !(char at j + 1 is digit)
+			push rcx
+
+			mov rcx, r14	; if !(char at j + 1 is digit)
 			call isDigit
+
+			pop rcx
+
 			cmp rax, 0
 			je .return_substring	; then
 			
@@ -286,12 +298,13 @@ parseInt:
 	xor r11, r11	; result is stored there
 	
 	.loop:
+	xor r10, r10
 	mov r10b, byte[r9]	; r10 = string[r9]
 	cmp r10b, 0
 	je .cleanup_return	;end of string
 	
 	inc r9
-	sub r10, '0'	; convert to number
+	sub r10b, '0'	; convert to number
 	imul r11, 10	; r11*10 + r10
 	add r11, r10
 	
@@ -574,7 +587,7 @@ calculate:
 	
 	pop rsi
 	
-	mov [rsi], r9	; int error_code > 0, if there were errors
+	mov qword[rsi], r9	; int error_code > 0, if there were errors
 	
 	ret
 
