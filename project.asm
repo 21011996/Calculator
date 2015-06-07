@@ -75,25 +75,25 @@ section .text
 ;Returns:
 ;	RAX - length(string)
 strlength:
-	push r9	; because of working with recursive methods it's safer to save all used registers
+	push r10	; because of working with recursive methods it's safer to save all used registers
 	push r8 ; the only register, witch I don't need to save is RAX, 
 			; because in recursion ones it contains answer, we got answer for everything.
 	
-	xor r9,r9	; r9 = length
+	xor r10,r10	; r10 = length
 	mov r8, rdi	; r8 = address of string
 	
 	.loop:
 		cmp byte[r8], 0 ; if (end of string)
 		je .return	; then
-		inc r9	; else
+		inc r10	; else
 		inc r8
 		jmp .loop
 		
 	.return:
-		mov rax, r9	; return answer
+		mov rax, r10	; return answer
 		
 		pop r8
-		pop r9
+		pop r10
 		ret
 	
 	ret
@@ -292,18 +292,18 @@ next:
 parseInt:
 	push r11
 	push r10
-	push r9
+	push r8
 	
-	mov r9, rdi	; r9 = string
+	mov r8, rdi	; r8 = string
 	xor r11, r11	; result is stored there
 	
 	.loop:
 	xor r10, r10
-	mov r10b, byte[r9]	; r10 = string[r9]
+	mov r10b, byte[r8]	; r10 = string[r8]
 	cmp r10b, 0
 	je .cleanup_return	;end of string
 	
-	inc r9
+	inc r8
 	sub r10b, '0'	; convert to number
 	imul r11, 10	; r11*10 + r10
 	add r11, r10
@@ -312,7 +312,7 @@ parseInt:
 	
 	.cleanup_return:
 		mov rax, r11
-		pop r9
+		pop r8
 		pop r10
 		pop r11
 		ret
@@ -439,11 +439,11 @@ parseSum:
 	
 	push r11
 	push r10
-	push r9
+	push r12
 	push r8
 	
 	call parseMultiplier
-	mov r9, rax	; lets call r9 "left"
+	mov r12, rax	; lets call r12 "left"
 	
 	.loop:
 		call next
@@ -461,7 +461,7 @@ parseSum:
 		
 	.multiply:
 		call parseMultiplier
-		imul r9, rax	; left = left * parseMultiplier()
+		imul r12, rax	; left = left * parseMultiplier()
 		jmp .loop
 		
 	.divide:
@@ -475,10 +475,10 @@ parseSum:
 		; else
 		push rdx	; preparations for IDIV
 		xor rdx, rdx
-		mov rax, r9
+		mov rax, r12
 		
-		idiv r11	; r9/r11
-		mov r9, rax ; left = left / right
+		idiv r11	; r12/r11
+		mov r12, rax ; left = left / right
 		
 		pop rdx
 		
@@ -486,7 +486,7 @@ parseSum:
 	
 	.return_error:
 		pop r8
-		pop r9
+		pop r12
 		pop r10
 		pop r11
 		
@@ -494,12 +494,12 @@ parseSum:
 		ret
 		
 	.return_left:
-		mov rax, r9
+		mov rax, r12
 		jmp .cleanup_return
 		
 	.cleanup_return:
 		pop r8
-		pop r9
+		pop r12
 		pop r10
 		pop r11
 		
@@ -516,11 +516,11 @@ parseExpr:
 	check_error
 	
 	push r10
-	push r9
+	push r11
 	push r8
 
 	call parseSum
-	mov r9, rax	; "left" = parseSum()
+	mov r11, rax	; "left" = parseSum()
 	
 	.loop:
 		mov r8, [rdx + Lexer.current]
@@ -544,26 +544,26 @@ parseExpr:
 		dec r10
 		mov qword[rdx + Lexer.balance], r10
 		
-		mov rax, r9	; return left
+		mov rax, r11	; return left
 		jmp .cleanup_return
 		
 	.just_return:
-		mov rax, r9	; return left
+		mov rax, r11	; return left
 		jmp .cleanup_return
 		
 	.sum:
 		call parseSum
-		add r9, rax	; left = left + parseSum()
+		add r11, rax	; left = left + parseSum()
 		jmp .loop
 		
 	.diff:
 		call parseSum
-		sub r9, rax	; left = left - parseSum()
+		sub r11, rax	; left = left - parseSum()
 		jmp .loop
 		
 	.cleanup_return:
 		pop r8
-		pop r9
+		pop r11
 		pop r10
 		
 		ret
@@ -588,6 +588,13 @@ calculate:
 	pop rsi
 	
 	mov qword[rsi], r9	; int error_code > 0, if there were errors
+	cmp r9, 0
+	jg .return_devil_number
+	jmp .return_normal_number
 	
+	.return_devil_number:
+		mov rax, 666
+		
+	.return_normal_number:
 	ret
 
