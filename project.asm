@@ -574,7 +574,7 @@ calculate:
 	
 	pop rsi
 	
-	mov rsi, r9	; int error_code > 0, if there were errors
+	mov [rsi], r9	; int error_code > 0, if there were errors
 	
 	ret
 
