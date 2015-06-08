@@ -152,6 +152,14 @@ isDigit:
 	
 	mov r15, rdi
 	add r15, rcx
+
+	push r14
+
+	xor r14, r14
+	mov r14b, byte[r15]
+	sub r14b, '0'
+	
+	pop r14
 	
 	cmp byte[r15], '0'
 	jl .return_0
@@ -327,17 +335,17 @@ parseInt:
 parseValue:
 	check_error
 	
-	push rdi
+	push r8
 	push rcx
 	
-	mov rdi, [rdx + Lexer.current]
+	mov r8, [rdx + Lexer.current]
 	xor rcx, rcx
 	call isDigit
 	cmp rax, rcx
 	
 	jg .return_value
 	
-	cmp byte[rdi], '('
+	cmp byte[r8], '('
 	je .return_Expression
 	
 	jmp .return_error
@@ -359,7 +367,7 @@ parseValue:
 		
 	.cleanup_return:
 		pop rcx
-		pop rdi
+		pop r8
 		ret
 		
 
@@ -519,7 +527,7 @@ parseExpr:
 	push r11
 	push r8
 
-	call parseSum
+call parseSum
 	mov r11, rax	; "left" = parseSum()
 	
 	.loop:
@@ -587,7 +595,7 @@ calculate:
 	
 	pop rsi
 	
-	mov qword[rsi], r9	; int error_code > 0, if there were errors
+	mov rsi, r9	; int error_code > 0, if there were errors
 	cmp r9, 0
 	jg .return_devil_number
 	jmp .return_normal_number
