@@ -485,6 +485,9 @@ parseSum:
 		cmp byte[r8], '/'
 		je .divide
 		
+		cmp byte[r8], '%'
+		je .mod
+		
 		jmp .return_left
 		
 		
@@ -508,6 +511,26 @@ parseSum:
 		
 		idiv r11	; r12/r11
 		mov r12, rax ; left = left / right
+		
+		pop rdx
+		
+		jmp .loop
+
+	.mod:
+		call parseMultiplier	; "right" = parseMultiplier
+		mov r11, rax	; r11 = "right"
+		
+		xor r10, r10
+		
+		cmp r11, r10	; if (right = 0)
+		je .return_error	; then
+		; else
+		push rdx	; preparations for IDIV
+		xor rdx, rdx
+		mov rax, r12
+		
+		idiv r11	; r12%r11
+		mov r12, rdx ; left = left % right
 		
 		pop rdx
 		
@@ -544,6 +567,7 @@ parseSum:
 parseExpr:
 	check_error
 	
+	push r12
 	push r10
 	push r11
 	push r8
@@ -566,7 +590,7 @@ call parseSum
 		cmp byte[r8], '-'
 		je .diff
 		
-		jmp .loop
+		jmp .return_error
 		
 	.return_minus_balance:
 		mov r10, qword[rdx + Lexer.balance]	; balance--
@@ -590,10 +614,16 @@ call parseSum
 		sub r11, rax	; left = left - parseSum()
 		jmp .loop
 		
+	.return_error:
+		inc r9
+		xor rax, rax
+		jmp .cleanup_return
+		
 	.cleanup_return:
 		pop r8
 		pop r11
 		pop r10
+		pop r12
 		
 		ret
 		
@@ -616,14 +646,26 @@ calculate:
 	
 	pop rsi
 	
-	mov rsi, r9	; int error_code > 0, if there were errors
-	cmp r9, 0
-	jg .return_devil_number
-	jmp .return_normal_number
+	push r8
+	mov r8, [rdx + Lexer.balance]
+	cmp r8, 0
+	pop r8
+	
+	jne .return_error
+	jmp .check_errors
+	
+	.return_error
+		inc r9
+		
+	.check_errors	
+		mov rsi, r9	; int error_code > 0, if there were errors
+		cmp r9, 0
+		jg .return_devil_number
+		jmp .return_normal_number
 	
 	.return_devil_number:
 		mov rax, 666
 		
 	.return_normal_number:
-	ret
+		ret
 
