@@ -335,23 +335,29 @@ parseInt:
 parseValue:
 	check_error
 	
-	push r8
+	push r10
 	push rcx
 	
-	mov r8, [rdx + Lexer.current]
+	mov r10, [rdx + Lexer.current]
 	xor rcx, rcx
 	call isDigit
 	cmp rax, rcx
 	
 	jg .return_value
 	
-	cmp byte[r8], '('
+	cmp byte[r10], '('
 	je .return_Expression
 	
 	jmp .return_error
 	
 	.return_value:
+		push rdi
+		
+		mov rdi, r10
 		call parseInt
+
+		pop rdi
+
 		jmp .cleanup_return
 		
 	.return_Expression:
@@ -367,7 +373,7 @@ parseValue:
 		
 	.cleanup_return:
 		pop rcx
-		pop r8
+		pop r10
 		ret
 		
 
