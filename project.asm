@@ -657,8 +657,8 @@ calculate:
 	.return_error
 		inc r9
 		
-	.check_errors	
-		mov rsi, r9	; int error_code > 0, if there were errors
+	.check_errors
+		mov qword[rsi], r9	; int error_code > 0, if there were errors
 		cmp r9, 0
 		jg .return_devil_number
 		jmp .return_normal_number

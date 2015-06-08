@@ -4,14 +4,6 @@
 #include <stddef.h>
 #include <string.h>
 
-/**
- * int sign
- * int size
- * int64_t* data
- * base is 2^64
- */
-typedef void* Lexer;
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,7 +12,7 @@ extern "C" {
 Extracts value from string
 */
 
-int calculate(char const *s, int code);
+int calculate(char const *s, int* code);
 
 #ifdef __cplusplus
 }

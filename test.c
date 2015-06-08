@@ -4,9 +4,10 @@
 #include <math.h>
 
 int main() {
-	int q;
-	int answer = calculate("23*(2+(6/2))",q);
+	int code = 0;
+	int* codelink = &code;
+	int answer = calculate(")", codelink);
 	printf("%i \n", answer);
-	printf("%i \n", q);
+	printf("%i \n", *codelink);
 
 }
