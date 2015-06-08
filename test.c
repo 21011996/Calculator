@@ -5,7 +5,7 @@
 
 int main() {
 	int q;
-	int answer = calculate("1+(2)",q);
+	int answer = calculate("23*(2+(6/2))",q);
 	printf("%i \n", answer);
 	printf("%i \n", q);
 

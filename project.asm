@@ -336,13 +336,23 @@ parseValue:
 	check_error
 	
 	push r10
-	push rcx
 	
 	mov r10, [rdx + Lexer.current]
+
+	push rdi
+
+	mov rdi, r10
+
+	push rcx
+
 	xor rcx, rcx
 	call isDigit
 	cmp rax, rcx
 	
+	pop rcx
+
+	pop rdi
+
 	jg .return_value
 	
 	cmp byte[r10], '('
@@ -361,9 +371,15 @@ parseValue:
 		jmp .cleanup_return
 		
 	.return_Expression:
+
+		push rcx
+
 		mov rcx, qword[rdx + Lexer.balance]
 		inc rcx
 		mov qword[rdx + Lexer.balance], rcx
+
+		pop rcx
+
 		call parseExpr
 		jmp .cleanup_return
 		
@@ -372,7 +388,6 @@ parseValue:
 		jmp .cleanup_return
 		
 	.cleanup_return:
-		pop rcx
 		pop r10
 		ret
 		
