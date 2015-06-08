@@ -10,7 +10,7 @@ section .text
 
 ; Structure Lexer to work with recursive calls from outside
 ;
-; .s - address of given string
+; .s - address of substring
 ; .cur - number, witch reflects where parser is currently working in the .s
 ; .current - working string, usually = (Expression)
 ; .length - .s.length()
@@ -100,7 +100,7 @@ constructor:
 	push rdx
 	push rdi
 	push rsi
-	push r9	; i wonder why calloc spoils r9?
+	push r9
 	
 	mov rdi, 1	;allocate 1 Lexer
 	mov rsi, Lexer_size	;Lexer size
@@ -111,7 +111,7 @@ constructor:
 	pop rsi
 	pop rdi
 	
-	mov [rdx + Lexer.s], rdi	;fill string address
+	mov rcx, rbp	;fill string address
 	mov qword[rdx + Lexer.cur], 0	;fill cur with 0
 	mov qword[rdx + Lexer.current], 0	;fill current with 0
 	mov qword[rdx + Lexer.balance], 0	;fill balance with 0
@@ -624,14 +624,16 @@ call parseSum
 ;	RDX - Lexer to destroy	
 deleteLexer:
 	push rdi
+	push rdx
 	push r9
 	push rax
-	push_regs
+
 	mov rdi, rdx
 	call free
-	pop_regs
+
 	pop rax
 	pop r9
+	pop rdx
 	pop rdi
 	
 	ret
@@ -646,7 +648,7 @@ deleteLexer:
 ;	RAX - calculated value of given string
 calculate:
 	push rsi	; just in case
-	
+
 	xor r9, r9	; r9 = 1 if an error occurred
 	call constructor	; create Lexer from string
 	mov rdx, rax	; move Lexer to safe register, from now, Lexer is always in RDX
