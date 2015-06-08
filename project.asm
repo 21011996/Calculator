@@ -1,19 +1,9 @@
 default rel
 
 extern calloc
-extern printf
-extern free
 
+global testCalculate
 global calculate
-global constructor
-global strlength
-global parseExpr
-global parseSum
-global parseMultiplier
-global next
-global isDigit
-global parseValue
-global parseInt
 
 section .text
 
@@ -628,8 +618,8 @@ call parseSum
 		ret
 		
 	
-; int calculate(char const *s, int error_code);
-; Takes String, returns parsed value.
+; int calculate(char const *s, int* code);
+; Takes String, returns value.
 ;
 ;Takes:
 ;	RDI - string
@@ -660,12 +650,74 @@ calculate:
 	.check_errors
 		mov qword[rsi], r9	; int error_code > 0, if there were errors
 		cmp r9, 0
-		jg .return_devil_number
+		jg .return_bad_number
 		jmp .return_normal_number
 	
-	.return_devil_number:
-		mov rax, 666
+	.return_bad_number:
+		mov rax, 0
 		
 	.return_normal_number:
 		ret
+		
+
+; int testCalculate(int option, char const *s, int shouldEquals);
+; Tests calculate with 3 different options:
+; 1 - should fail
+; 2 - should equals
+;
+; On option 1 returns 0 if test passed, 1 if test failed.
+; On option 2 returns 0 if test passed, number = shouldEquals-calculate if test failed.
+;
+;Takes:
+;	RDI - option
+;	RSI - string
+;	RDX - needed value
+testCalculate:
+	cmp rdi, 1
+	je .test_fail
+	
+	cmp rdi, 2
+	je .test_equals
+	
+	ret
+	
+	.test_fail:
+		mov rdi, rsi
+		sub rsi, 15
+		
+		call calculate
+		
+		cmp qword[rsi], 0
+		jg .return_0
+		jmp .return_1
+	
+	.test_equals:
+		mov rdi, rsi
+		sub rsi, 15
+		
+		push rdx
+		
+		call calculate
+		
+		pop rdx
+		
+		cmp qword[rsi], 0
+		je .return_1
+		jmp .return_diff
+		
+	.return_0
+		xor rax, rax
+		ret
+			
+	.return_1
+		xor rax, rax
+		inc rax
+		ret
+		
+	.return_diff
+		sub rdx, rax
+		mov rax, rdx
+		ret
+		
+		
 
