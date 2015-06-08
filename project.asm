@@ -1,6 +1,7 @@
 default rel
 
 extern calloc
+extern free
 
 global testCalculate
 global calculate
@@ -617,7 +618,24 @@ call parseSum
 		
 		ret
 		
+; Destroys Lexer for better future calls
+;
+; Takes:
+;	RDX - Lexer to destroy	
+deleteLexer:
+	push rdi
+	push r9
+	push rax
+	push_regs
+	mov rdi, rdx
+	call free
+	pop_regs
+	pop rax
+	pop r9
+	pop rdi
 	
+	ret
+
 ; int calculate(char const *s, int* code);
 ; Takes String, returns value.
 ;
@@ -633,9 +651,10 @@ calculate:
 	call constructor	; create Lexer from string
 	mov rdx, rax	; move Lexer to safe register, from now, Lexer is always in RDX
 	call parseExpr	; rax = parseExpr
+	call deleteLexer	; subj	
 	
 	pop rsi
-	
+
 	push r8
 	mov r8, [rdx + Lexer.balance]
 	cmp r8, 0
@@ -658,66 +677,3 @@ calculate:
 		
 	.return_normal_number:
 		ret
-		
-
-; int testCalculate(int option, char const *s, int shouldEquals);
-; Tests calculate with 3 different options:
-; 1 - should fail
-; 2 - should equals
-;
-; On option 1 returns 0 if test passed, 1 if test failed.
-; On option 2 returns 0 if test passed, number = shouldEquals-calculate if test failed.
-;
-;Takes:
-;	RDI - option
-;	RSI - string
-;	RDX - needed value
-testCalculate:
-	cmp rdi, 1
-	je .test_fail
-	
-	cmp rdi, 2
-	je .test_equals
-	
-	ret
-	
-	.test_fail:
-		mov rdi, rsi
-		sub rsi, 15
-		
-		call calculate
-		
-		cmp qword[rsi], 0
-		jg .return_0
-		jmp .return_1
-	
-	.test_equals:
-		mov rdi, rsi
-		sub rsi, 15
-		
-		push rdx
-		
-		call calculate
-		
-		pop rdx
-		
-		cmp qword[rsi], 0
-		je .return_1
-		jmp .return_diff
-		
-	.return_0
-		xor rax, rax
-		ret
-			
-	.return_1
-		xor rax, rax
-		inc rax
-		ret
-		
-	.return_diff
-		sub rdx, rax
-		mov rax, rdx
-		ret
-		
-		
-
