@@ -3,7 +3,6 @@ default rel
 extern calloc
 extern free
 
-global testCalculate
 global calculate
 
 section .text
@@ -23,6 +22,7 @@ section .text
 .balance:	resq	1
 	endstruc
 
+; To avoid tons of copy paste I use this macro for checking exception.
 %macro check_error 0
 	xor rax, rax
 	cmp r9, rax
@@ -35,7 +35,7 @@ section .text
 	.proceed:
 %endmacro
 
-;I'm too lazy to save CSR 
+;I'm too lazy to save NCSR 
 %macro push_regs 0
 	push rbx
 	push rbp
@@ -107,11 +107,10 @@ constructor:
 	call calloc
 	mov rdx, rax	;address of Lexer
 	
-	pop r9
+	pop r9	; this is very important register 
 	pop rsi
 	pop rdi
 	
-	mov rcx, rbp	;fill string address
 	mov qword[rdx + Lexer.cur], 0	;fill cur with 0
 	mov qword[rdx + Lexer.current], 0	;fill current with 0
 	mov qword[rdx + Lexer.balance], 0	;fill balance with 0
@@ -120,6 +119,23 @@ constructor:
 	call strlength
 	
 	mov qword[rdx + Lexer.length], rax
+	
+	push rdx
+	push rdi
+	push rsi
+	push r9
+	
+	mov rdi, qword[rdx + Lexer.length]	;allocate length bytes for RCX
+	mov rsi, 1
+	call calloc
+	
+	pop r9	; this is very important register 
+	pop rsi
+	pop rdi
+	pop rdx
+	
+	mov [rdx + Lexer.s], rax
+	mov rcx, rax
 	
 	mov rax, rdx
 	
@@ -338,15 +354,15 @@ parseValue:
 
 	xor rcx, rcx
 	call isDigit
-	cmp rax, rcx
+	cmp rax, rcx	; if (current.charAt(0) is Digit)
 	
 	pop rcx
 
 	pop rdi
 
-	jg .return_value
+	jg .return_value	; then
 	
-	cmp byte[r10], '('
+	cmp byte[r10], '('	; else
 	je .return_Expression
 	
 	jmp .return_error
@@ -365,7 +381,7 @@ parseValue:
 
 		push rcx
 
-		mov rcx, qword[rdx + Lexer.balance]
+		mov rcx, qword[rdx + Lexer.balance]	; we entered new (), increase balance 
 		inc rcx
 		mov qword[rdx + Lexer.balance], rcx
 
@@ -401,10 +417,10 @@ parseMultiplier:
 	mov r8, rcx	; r8 = next, to work with
 	
 	cmp byte[r8], 0
-	je .return_error
+	je .return_error	; something is wrong with variable in String
 	
 	cmp byte[r8], '-'
-	je .return_minus
+	je .return_minus	; return left - right,
 	
 	cmp byte[r8], '+'
 	je .return_abs
@@ -623,6 +639,19 @@ call parseSum
 ; Takes:
 ;	RDX - Lexer to destroy	
 deleteLexer:
+	push rdi
+	push rdx
+	push r9
+	push rax
+
+	mov rdi, [rdx + Lexer.s]
+	call free
+
+	pop rax
+	pop r9
+	pop rdx
+	pop rdi
+	
 	push rdi
 	push rdx
 	push r9
