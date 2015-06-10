@@ -12,7 +12,7 @@ extern "C" {
 Extracts value from string
 */
 
-int calculate(char const *s, int* code);
+double calculate(char const *s, int* code);
 
 #ifdef __cplusplus
 }

@@ -35,28 +35,49 @@ section .text
 	.proceed:
 %endmacro
 
+; Macro to push XMM registers
+%macro push_xmm 1
+	sub rsp, 16
+	movsd [rsp], %1
+%endmacro
+
+%macro pop_xmm 1
+	movsd %1, [rsp]
+	add rsp, 16
+%endmacro
+
 ;I'm too lazy to save NCSR 
-%macro push_regs 0
-	push rbx
-	push rbp
-	push rsi
-	push rsp
-	push r12
-	push r13
-	push r14
-	push r15
+%macro push_all_regs 0
+    push    rdi
+    push    rsi
+    push    rdx
+    push    rcx
+    push    rbx
+    push    r8
+    push    r9
+    push    r10
+    push    r11
+    push    r12
+    push    r13
+    push    r14
+    push    r15
 %endmacro
 
 
-%macro pop_regs 0
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop rsp
-	pop rsi
-	pop rbp
-	pop rbx
+%macro pop_all_regs 0
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rbx
+    pop     rcx
+    pop     rdx
+    pop     rsi
+    pop     rdi
 %endmacro
 
 ; Counts given string length
@@ -160,13 +181,8 @@ isDigit:
 	mov r15, rdi
 	add r15, rcx
 
-	push r14
-
-	xor r14, r14
-	mov r14b, byte[r15]
-	sub r14b, '0'
-	
-	pop r14
+	cmp byte[r15], '.'
+	je .return_2
 	
 	cmp byte[r15], '0'
 	jl .return_0
@@ -177,6 +193,13 @@ isDigit:
 	
 	jmp .return_1
 	
+
+	.return_2:
+		inc rax
+		inc rax
+		pop r15
+		ret
+
 	.return_1:
 		inc rax
 		pop r15
@@ -199,6 +222,7 @@ next:
 	push r10
 	push r15
 	push rax
+	push rbp
 	
 	mov r10, qword[rdx + Lexer.cur]
 	mov r11, qword[rdx + Lexer.length]
@@ -222,6 +246,8 @@ next:
 		push r13
 		push r12
 		push r8
+
+		xor rbp, rbp
 		
 		mov r8, qword[rdx + Lexer.cur]	; create variable j = cur
 		
@@ -236,7 +262,7 @@ next:
 			
 			push rcx
 
-			mov rcx, r14	; if !(char at j + 1 is digit)
+			mov rcx, r14	; if !(char at j + 1 is digit) or !(char at j + 1 is '.')
 			call isDigit
 
 			pop rcx
@@ -244,6 +270,9 @@ next:
 			cmp rax, 0
 			je .return_substring	; then
 			
+			cmp rax, 2
+			je .set_flag
+				
 			inc r8
 			jmp .loop1
 		
@@ -270,7 +299,14 @@ next:
 			pop r14
 			
 			jmp .cleanup_return
-			
+	
+	.set_flag
+		cmp rbp, 0	; if flag > 0 then there are 2 '.' in one digit
+		jg .return_empty
+		inc rbp
+		inc r8
+		jmp .loop1
+		
 	.return_symbol:
 		push r14
 		
@@ -290,6 +326,7 @@ next:
 		jmp .cleanup_return
 		
 	.cleanup_return:
+		pop rbp
 		pop rax
 		pop r15
 		pop r10
@@ -298,40 +335,83 @@ next:
 		ret
 
 
-; String to int
+; Converts string to double
+; originally was made at 5th practice
 ;
-;Takes:
+; Takes:
 ;	RDI - string
-;Returns:
-;	RAX - integer value of string
-parseInt:
-	push r11
-	push r10
-	push r8
-	
-	mov r8, rdi	; r8 = string
-	xor r11, r11	; result is stored there
-	
-	.loop:
-	xor r10, r10
-	mov r10b, byte[r8]	; r10 = string[r8]
-	cmp r10b, 0
-	je .cleanup_return	;end of string
-	
-	inc r8
-	sub r10b, '0'	; convert to number
-	imul r11, 10	; r11*10 + r10
-	add r11, r10
-	
-	jmp .loop
-	
-	.cleanup_return:
-		mov rax, r11
-		pop r8
-		pop r10
-		pop r11
-		ret
-	
+; Returns:
+;	XMM0 - double
+str2double:
+	push_xmm xmm1
+        push rbp	; save CSR            
+        push rbx
+        push r12
+        push r13
+        push r14
+        push r15
+        mov r13, rdi	; move string to the safe place
+        xorps xmm0, xmm0	; prepare for answer
+        xor rdx, rdx	; make it zero to use as byte constant
+        mov dl, byte [rdi]	; check for "-", but in calculate we dont have "-"
+        cmp rdx, '-'
+        jne .prep_fraction	; start
+        inc rdi	; skip "-"
+
+    .prep_fraction:
+        xor rbx, rbx
+        mov r10, 4503599627370495	; max Int, for cheking errors   
+        mov r12, 10	; dec multiplier
+        xor r11, r11                
+        xor rax, rax
+        xor rcx, rcx
+    .loop:                         
+        mov cl, byte [rdi]	; cl is a part of rcx, made it zero
+        inc rdi	; next
+        cmp rcx, 0	; if (end of string)
+        je .done_fraction	; then
+        cmp rcx, '.'	; else              
+        je .begin_fraction	; if (we reached '.') then
+        test r11, r11	; else
+        jz .next_digit	; if (r11=0)
+        inc r11	; r11 counts numbers after '.'
+    .next_digit:
+        sub rcx, '0'	; convert to decimal number
+        mul r12	; mul by 10
+        add rax, rcx	; and put it to sub-answer
+        cmp rax, r10	; if (not overflow)
+        jl .loop	; proceed
+    .begin_fraction:                
+        mov r11, 1 ; flag is 1, because we are doing .part   
+        jmp .loop
+    .done_fraction:                
+        cvtsi2sd xmm0, rax	; xmm0 is string value, but ignores '.'
+        dec r11	; so we need to shift it by 10 r11-1 times
+        mov r9, 10
+        cvtsi2sd xmm1, r9 ; xmm1 is a shifter
+	cmp r11, 0
+	jl .done ; if r11 = 0 then its int to double
+    .loop1:
+        divsd xmm0, xmm1	
+        dec r11
+        jnz .loop1
+
+        xor rdx, rdx	; check if '-' was first byte
+        mov dl, byte [r13]	; unused in my case
+        cmp rdx, '-'
+        jne .done
+        movsd xmm1, xmm0            
+        subsd xmm0, xmm1
+        subsd xmm0, xmm1
+    .done:
+        pop r15                     
+        pop r14
+        pop r13
+        pop r12
+        pop rbx
+        pop rbp
+	pop_xmm xmm1
+        ret	
 
 ; Parses value of Lexer.current
 ;
@@ -370,8 +450,12 @@ parseValue:
 	.return_value:
 		push rdi
 		
+		push_all_regs
+
 		mov rdi, r10
-		call parseInt
+		call str2double
+		
+		pop_all_regs
 
 		pop rdi
 
@@ -435,26 +519,43 @@ parseMultiplier:
 	
 	.return_minus:
 		call parseMultiplier
-		mov r10, rax
-		neg r10
-		mov rax, r10
+		push_xmm xmm1
+		
+		movsd xmm1, xmm0            
+		subsd xmm0, xmm1
+		subsd xmm0, xmm1
+		
+		pop_xmm xmm1
 		jmp .cleanup_return
 	
 	.return_abs:
 		call parseMultiplier
-		mov r10, rax
+		push_xmm xmm1
+		push_xmm xmm2
+
+		movsd xmm1, xmm0
+		xorps xmm2, xmm2
+		cmpsd xmm2, xmm1, 5 ; 0 not less then xmm1
 		xor r11, r11
-		cmp r10, r11
-		jl .neg
+		cvtsd2si r10, xmm2
+		jne .neg
 		jmp .normal
 		
 		.neg:
-			neg r10
-			mov rax, r10
+			movsd xmm2, xmm1            
+			subsd xmm1, xmm2
+			subsd xmm1, xmm2
+			movsd xmm0, xmm1
+			
+			pop_xmm xmm2
+			pop_xmm xmm1
 			jmp .cleanup_return
 			
 		.normal:
-			mov rax, r10
+			movsd xmm0, xmm1
+			
+			pop_xmm xmm2
+			pop_xmm xmm1
 			jmp .cleanup_return
 		
 	.cleanup_return:
@@ -479,7 +580,9 @@ parseSum:
 	push r8
 	
 	call parseMultiplier
-	mov r12, rax	; lets call r12 "left"
+	push_xmm xmm1
+	push_xmm xmm2
+	movsd xmm1, xmm0	; lets call xmm1 "left"
 	
 	.loop:
 		call next
@@ -492,71 +595,47 @@ parseSum:
 		cmp byte[r8], '/'
 		je .divide
 		
-		cmp byte[r8], '%'
-		je .mod
-		
 		jmp .return_left
 		
 		
 	.multiply:
 		call parseMultiplier
-		imul r12, rax	; left = left * parseMultiplier()
+		
+		mulsd xmm1, xmm0	; left = left * parseMultiplier()
 		jmp .loop
 		
 	.divide:
 		call parseMultiplier	; "right" = parseMultiplier
-		mov r11, rax	; r11 = "right"
+		push_xmm xmm3
+		movsd xmm2, xmm0	; xmm2 = "right"
 		
-		xor r10, r10
+		xorpd xmm3, xmm3
 		
-		cmp r11, r10	; if (right = 0)
-		je .return_error	; then
+		cmpsd xmm3, xmm2, 0	; if (right = 0)
+		
+		cvtsd2si r10, xmm3
+		pop_xmm xmm3
+		cmp r10, 0
+		jg .return_error	; then
 		; else
-		push rdx	; preparations for IDIV
-		xor rdx, rdx
-		mov rax, r12
-		
-		idiv r11	; r12/r11
-		mov r12, rax ; left = left / right
-		
-		pop rdx
-		
-		jmp .loop
-
-	.mod:
-		call parseMultiplier	; "right" = parseMultiplier
-		mov r11, rax	; r11 = "right"
-		
-		xor r10, r10
-		
-		cmp r11, r10	; if (right = 0)
-		je .return_error	; then
-		; else
-		push rdx	; preparations for IDIV
-		xor rdx, rdx
-		mov rax, r12
-		
-		idiv r11	; r12%r11
-		mov r12, rdx ; left = left % right
-		
-		pop rdx
+		divsd xmm1, xmm2	; left/right
 		
 		jmp .loop
 	
-	.return_error:
-		pop r8
-		pop r12
-		pop r10
-		pop r11
-		
+	.return_error:		
 		inc r9	; set error flag
+
+		jmp .cleanup_return
 		ret
 		
 	.return_left:
-		mov rax, r12
+		movsd xmm0, xmm1
 		jmp .cleanup_return
 		
 	.cleanup_return:
+		pop_xmm xmm2
+		pop_xmm xmm1
+
 		pop r8
 		pop r12
 		pop r10
@@ -579,8 +658,9 @@ parseExpr:
 	push r11
 	push r8
 
-call parseSum
-	mov r11, rax	; "left" = parseSum()
+	call parseSum
+	push_xmm xmm1
+	movsd xmm1, xmm0	; "left" = parseSum()
 	
 	.loop:
 		mov r8, [rdx + Lexer.current]
@@ -604,29 +684,30 @@ call parseSum
 		dec r10
 		mov qword[rdx + Lexer.balance], r10
 		
-		mov rax, r11	; return left
+		movsd xmm0, xmm1	; return left
 		jmp .cleanup_return
 		
 	.just_return:
-		mov rax, r11	; return left
+		movsd xmm0, xmm1	; return left
 		jmp .cleanup_return
 		
 	.sum:
 		call parseSum
-		add r11, rax	; left = left + parseSum()
+		addsd xmm1, xmm0	; left = left + parseSum()
 		jmp .loop
 		
 	.diff:
 		call parseSum
-		sub r11, rax	; left = left - parseSum()
+		subsd xmm1, xmm0	; left = left - parseSum()
 		jmp .loop
 		
 	.return_error:
 		inc r9
-		xor rax, rax
+		xorpd xmm0, xmm0
 		jmp .cleanup_return
 		
 	.cleanup_return:
+		pop_xmm xmm1
 		pop r8
 		pop r11
 		pop r10
@@ -667,7 +748,7 @@ deleteLexer:
 	
 	ret
 
-; int calculate(char const *s, int* code);
+; double calculate(char const *s, int* code);
 ; Takes String, returns value.
 ;
 ;Takes:
@@ -705,6 +786,8 @@ calculate:
 	
 	.return_bad_number:
 		mov rax, 0
+		cvtsi2sd xmm1, rax
+		movsd xmm0, xmm1 
 		
 	.return_normal_number:
 		ret
