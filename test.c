@@ -21,8 +21,8 @@ void testresult(double a) {
 
 int main() {
 	testresult(testCalculate("8.8/2", 4.4));
-	testresult(testCalculate("(((1+2*2)))%(13-4)", 5.0));
-	testresult(testCalculate("1000000*(((6-1-2-3)))", 0.0));
-	testresult(testCalculate("44*6-((5)-(2*2))/2+3/3*((4))*(-333)", -1068.0));
-	testresult(testCalculate("3*6/4-555(7-8)+(((555)))/(((((99)))+(-94)))", 115.0));
+	testresult(testCalculate("(((1.0+2.1+2.3)))/(13.5-4.5)", 0.6));
+	testresult(testCalculate("1000000.55555*(((6-1-2-3)))", 0.0));
+	testresult(testCalculate("44*6-((5)-(2*2))/2.234+3.0/3.00000*((4.4))*(-333)", -1201.64762757));
+	testresult(testCalculate("3*6/0.22-555/(7.02-8.22)+(((555)))/(((((99)))+(-94)))", 655.318181818));
 }

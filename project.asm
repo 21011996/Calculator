@@ -389,6 +389,8 @@ str2double:
         dec r11	; so we need to shift it by 10 r11-1 times
         mov r9, 10
         cvtsi2sd xmm1, r9 ; xmm1 is a shifter
+	cmp r11, 0
+	jl .done ; if r11 = 0 then its int to double
     .loop1:
         divsd xmm0, xmm1	
         dec r11
