@@ -2,7 +2,6 @@ default rel
 
 extern calloc
 extern free
-extern str2double
 
 global calculate
 
@@ -344,6 +343,7 @@ next:
 ; Returns:
 ;	XMM0 - double
 str2double:
+	push_xmm xmm1
         push rbp	; save CSR            
         push rbx
         push r12
@@ -408,6 +408,7 @@ str2double:
         pop r12
         pop rbx
         pop rbp
+	pop_xmm xmm1
         ret	
 
 ; Parses value of Lexer.current
@@ -532,8 +533,10 @@ parseMultiplier:
 
 		movsd xmm1, xmm0
 		xorps xmm2, xmm2
-		cmpsd xmm1, xmm2, 5 ;not less then xmm0
-		jl .neg
+		cmpsd xmm2, xmm1, 5 ; 0 not less then xmm1
+		xor r11, r11
+		cvtsd2si r10, xmm2
+		jne .neg
 		jmp .normal
 		
 		.neg:
@@ -576,6 +579,7 @@ parseSum:
 	
 	call parseMultiplier
 	push_xmm xmm1
+	push_xmm xmm2
 	movsd xmm1, xmm0	; lets call xmm1 "left"
 	
 	.loop:
@@ -600,28 +604,26 @@ parseSum:
 		
 	.divide:
 		call parseMultiplier	; "right" = parseMultiplier
-		push_xmm xmm2
 		push_xmm xmm3
 		movsd xmm2, xmm0	; xmm2 = "right"
 		
 		xorpd xmm3, xmm3
 		
-		cmpsd xmm2, xmm3, 0	; if (right = 0)
+		cmpsd xmm3, xmm2, 0	; if (right = 0)
 		
+		cvtsd2si r10, xmm3
 		pop_xmm xmm3
-		je .return_error	; then
+		cmp r10, 0
+		jg .return_error	; then
 		; else
 		divsd xmm1, xmm2	; left/right
 		
 		jmp .loop
 	
-	.return_error:
-		pop r8
-		pop r12
-		pop r10
-		pop r11
-		
+	.return_error:		
 		inc r9	; set error flag
+
+		jmp .cleanup_return
 		ret
 		
 	.return_left:
@@ -629,6 +631,7 @@ parseSum:
 		jmp .cleanup_return
 		
 	.cleanup_return:
+		pop_xmm xmm2
 		pop_xmm xmm1
 
 		pop r8
