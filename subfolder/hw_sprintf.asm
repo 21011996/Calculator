@@ -8,7 +8,7 @@ minus	equ 1<<2
 zero	equ 1<<3	; zero_padding
 unsigned	equ 1<<5
 negative	equ 1<<6
-long	equ 1<<7	; ll
+llong	equ 1<<7	; ll
 sign_done  equ 1<<8
 	
 hw_sprintf:
@@ -77,7 +77,7 @@ parse:
 		lodsb
 		jmp .parse_flags
 		%%skip:	
-	%finishmacro
+	%endmacro
 
 	.parse_flags:
 	get_flags '+', plus
@@ -116,7 +116,7 @@ parse:
 	jne .exception
 	inc esi			;skip "ll"
 	lodsb
-	or dword flags, long
+	or dword flags, llong
 	.size_parsed:
 	
 	cmp al, '%'
@@ -166,7 +166,7 @@ print_number:
 	mov eax, [eax]		;get arguments
 	add dword arguments, 4	;set pointer to next argument
 
-	test dword flags, long
+	test dword flags, llong
 	jz .check_if_int
 	mov edx, arguments
 	mov edx, [edx]	        ;if (long) get second part of number
@@ -196,7 +196,7 @@ print_number:
 	mov ebx, width		;ebx = width
 	mov esi, 10
 	push 0			;watch point in stack ( to find sequence)
-	test dword flags, long
+	test dword flags, llong
 	jnz .divide_ulong
 	
 	.divide_uint:		;put number by digits on stack
